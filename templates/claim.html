@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <title>Project</title>
+
+    <!--suppress BadExpressionStatementJS -->
+    <script>
+
+        // Api call for logout
+        $(function (){
+            $('#logout').on('click', (e)=>{
+                e.preventDefault()
+                $.getJSON('/logout', (res)=>{
+                    if(res.message === 'ok')
+                       window.location.reload()
+                    else{
+                        alert("Error on logout")
+                    }
+                })
+            })
+        })
+
+        function postReply(text, sqlid, parentId){
+            $.ajax({
+                    type: "POST",
+                    url: 'http://localhost:3001/reply',
+                    data:  text + "&claimId=" + JSON.stringify(sqlid) + "&parentId=" + JSON.stringify(parentId),
+                    success: (data) => {
+                        insertMessage(data, parentId === 0 ? "rootComment" : "comment")
+                    }
+               })
+        }
+
+        function formatDate(date){
+            date = new Date(date)
+            return date.getDate() + "/" + date.getMonth() + "/" + date.getFullYear() + " at " + date.getHours() + ":" + date.getMinutes();
+        }
+
+        function insertMessage(reply, into="rootComment"){
+            let newCommentSection = $(document.createElement("div"))
+                        .attr('id', "comment" + reply.id)
+            // appending the new comment to the parent node
+            let rootComment = $('#' + into + (into === "comment" ? reply.parent_id : reply.claim_id))
+            let newCommentBody = $(document.createElement("div"))
+                    .addClass('comment')
+                    .addClass('newItem')
+                    .attr('replyId', reply.id)
+                    .append($(document.createElement("p")).addClass("postedBy").html(reply.type + " postat de " + reply.username + ' on ' + formatDate(reply.post_date)))
+                    .append($(document.createElement("p")).html(reply.text))
+
+
+                const btn = $(document.createElement("button"))
+                    .addClass("commentButton")
+                    .attr("sqlid", reply.id)
+                    .html("raspunde")
+                btn.on('click', (e)=>{
+
+                        // add reply elements if not already present
+                        e.preventDefault();
+                        e.stopPropagation();
+
+                        if(!$("#r"+reply.id).length) {
+                            let replyTextBox = $(document.createElement("input")).attr("type", "text").attr("id", "r" + reply.id)
+                            let selector = $(document.createElement("select"))
+                                            .append($(document.createElement("option")).html("demonstratie").attr("value", 4))
+                                            .append($(document.createElement("option")).html("sustinere").attr("value", 5))
+                                            .append($(document.createElement("option")).html("redundant").attr("value", 6))
+
+                            let actionButton = $(document.createElement("button")).html("post").addClass("replyButton")
+                            actionButton.on('click', (e) => {
+                                // api call with textbox value
+                                if(replyTextBox.val()){
+                                    postReply("text=" + replyTextBox.val().trim() + "&type="+selector.children("option:selected").val(), parseInt(reply.claim_id), reply.id)
+                                }
+                            })
+                            let group = $(document.createElement("div"))
+                            .addClass("replyGroup")
+                            .append(replyTextBox)
+                            .append(selector)
+                            .append(actionButton)
+                            newCommentSection.before(group)
+                        }
+
+                    })
+                newCommentSection.append(btn)
+            newCommentBody.append(newCommentSection)
+            rootComment.append(newCommentBody)
+            newCommentBody.css('padding-left', "20px").addClass("newItem")
+        }
+
+        $(function (){
+            $.ajax({
+                    type: 'GET',
+                    url: 'http://localhost:3001/replies',
+                    data: {topicId: {{claim.topic_id}}, claimId: {{claim.id}}},
+                    success: (replies) => {
+                        while(!(replies.length === 0)){
+                            replies.forEach((reply, index)=>{
+                                // if it's directly linked to claim
+                                if(reply.parent_id === 0) {
+                                    insertMessage(reply);
+                                    replies.splice(index, 1)
+                            }
+                            else{
+                                // Cannot add the new comment unless it's parent is loaded
+                                let parentComment = $('#comment'+reply.parent_id);
+                                if(parentComment.length){
+                                    insertMessage(reply, "comment")
+                                    replies.splice(index, 1)
+                                }
+                            }
+                        })
+                        }
+
+                    }
+                })
+        })
+
+
+        function postReplyFun(e){
+            const el = $(e.currentTarget)
+            const sqlid = parseInt(el.attr('sqlid'))
+            const form = $("#replyForm"+sqlid)
+            if(form.children("input").val()){
+                const serialized = form.serialize()
+                const parentId = el.attr('root') ? 0 : parseInt(el.attr('sqlid'))
+                postReply(serialized, sqlid, parentId)
+            }
+        }
+
+        // Posting a message
+        $(function (){
+            $('.replyButton').on('click', (e)=>{
+                e.preventDefault()
+                e.stopPropagation()
+                e.stopImmediatePropagation()
+                postReplyFun(e)
+            })
+        })
+
+                    // Handle registration
+       $(()=>{
+           $("#registerButton").on('click', (e)=>{
+               e.preventDefault()
+               const form = $("#registerForm")
+               $.ajax({
+                    type: form.attr('method'),
+                    url: 'http://localhost:3001/register',
+                    data: form.serialize(),
+                    success: (data) => {
+                        if(!data.user)
+                            alert(data.msg)
+                        else
+                            window.location.reload();                    }
+               })
+           })
+       })
+            $(()=>{
+           $("#loginButton").on('click', (e)=>{
+               e.preventDefault()
+               const form = $("#loginForm")
+               $.ajax({
+                    type: form.attr('method'),
+                    url: 'http://localhost:3001/login',
+                    data: form.serialize(),
+                   success: (data) => {
+                        if(data.message === "ok")
+                            window.location.reload();
+                        else{
+                            alert(data.message)
+                        }
+                    }
+               })
+           })
+       })
+
+        function filterClaims(key){
+            // find all claims, hide them by default
+            // then show only the ones who match the key
+            $("#claims").find('>').hide().filter((index, claim)=>{
+                    let claimText = $(claim).contents().find(".card-content").html()
+                    return claimText.includes(key)}
+                ).show()
+        }
+
+
+        $(()=>{
+            $("#searchBox").on("input", (e)=>{
+                e.preventDefault()
+                const text = $(e.currentTarget).val()
+                if(text.length !== 0)
+                    filterClaims(text)
+                else{
+                    $("#claims").find('>').show()
+                }
+            })
+        })
+
+
+        function getRelationships(cid){
+            $.ajax({
+                type: "GET",
+                url: 'http://localhost:3001/relationship/'+cid,
+                success: (data)=>{
+                    let cl = $(".card[sqlid="+cid+"]").children(".card-header")
+                    let opposing_div = $(document.createElement("div")).css("display", "flex")
+                    opposing_div.append($(document.createElement("p")).css("margin", "0").html("Opposed to: ").css("padding-right", ".25rem"))
+                    let equivalent_div = $(document.createElement("div")).css("display", "flex")
+                    equivalent_div.append($(document.createElement("p")).css("margin", "0").html("Postare asemanatoare cu : ").css("padding-right", ".25rem"))
+                    let c1 = 0, c2=0
+                    for(let rel of data){
+                        if(rel.type == "equivalent"){
+                            equivalent_div.append($(document.createElement("a")).css("color", "inherit").attr("href", rel.url).html("claim#" + rel.linked_to + " ").css("padding-right", ".25rem"))
+                            c1++
+                        }
+                        else{
+                            opposing_div.append($(document.createElement("a")).css("color", "inherit").attr("href", rel.url).html("claim#" + rel.linked_to + " ").css("padding-right", ".25rem"))
+                            c2++
+                        }
+                        
+                    }
+                    if(c1)
+                        cl.append(equivalent_div)
+                    if(c2)
+                        cl.append(opposing_div)
+
+                }
+            })
+        }
+
+        $(()=>{
+            $(".card-header").each((idx, el)=>{
+                let id = $(el).parent().attr("sqlid")
+                getRelationships(id)
+            })
+        })
+
+        $(()=>{
+            $(".card-header").each((idx, el)=>{
+                let id = $(el).parent().attr("sqlid")
+            })
+        })
+        
+        $(()=>{
+           $("#login").on("click", (e)=>{
+               e.stopPropagation()
+               e.stopImmediatePropagation()
+               e.preventDefault()
+               let dr = $(".dropdown-content-login")
+               dr.css("display", dr.css("display") == "block" ? "none" : "block")
+               if($('.dropdown-content-register').css("display") == "block")
+                $('.dropdown-content-register').css("display", "none")
+           })
+       })
+
+       $(()=>{
+           $("#reg").on("click", (e)=>{
+                e.stopPropagation()
+                e.stopImmediatePropagation()
+                e.preventDefault()
+
+               let dr = $(".dropdown-content-register")
+               dr.css("display", dr.css("display") == "block" ? "none" : "block")
+               if($('.dropdown-content-login').css("display") == "block")
+                $('.dropdown-content-login').css("display", "none")
+           })
+       })
+    </script>
+</head>
+
+<body>
+    <div class="nav">
+      <div class="right">
+         {%if user is defined%}
+        <h1 class="item">Hello {{user.username}}</h1>
+        <span class="item" id="logout"> Logout </span>
+
+        {%else%}
+
+
+<!--          LOGIN-->
+<div class="dropdown-login">
+    <span id="login">Log in</span>
+    <div class="dropdown-content-login">
+        <form method="POST" id="loginForm">
+            <label class="element" for="username">User name: <label><br>
+            <input class="element" name="username" type="text" placeholder="username"><br>
+            <label class="element" for="password">Password: <label><br>
+            <input class="element" name="password" type="password" placeholder="password"><br>
+            <input class="element" id="loginButton" type="button" value="Log in"/>
+        </form>
+    </div>
+  </div>
+
+<!--          REGISTER-->
+  <div class="dropdown-register">
+    <span id="reg">Register</span>
+    <div class="dropdown-content-register">
+        <form method="POST" id="registerForm">
+            <label class="element" for="username">User name: <label><br>
+            <input class="element" name="username" type="text" placeholder="username"><br>
+            <label class="element" for="password">Password: <label><br>
+            <input class="element" name="password" type="password" placeholder="password"><br>
+            <input class="element" id="registerButton" type="button" value="Register"/>
+        </form>
+    </div>
+  </div>
+        </div>
+        {%endif%}
+      </div>
+    </div>
+
+    <div class="main">
+        <div class="container">
+            <br>
+            <h1>Cauta explicatii</h1>
+            <input id="searchBox" type="text" placeholder="Search...">
+        </div>
+
+        <div class="wrapper">
+            <div class="container">
+            <div class="card" sqlid="{{claim.id}}">
+                <header class="card-header">
+                <h2 class="card-title">Explicatie postata de {{claim.username}}</h2>
+                </header>
+                <div class="card-body">
+                <p class="card-content">
+                    {{claim.text}}
+                </p>
+                <div class="comments" id="rootComment{{claim.id}}">
+
+                </div>
+                </div>
+                <footer class="card-footer">
+                    <form method="POST" id="replyForm{{claim.id}}">
+                        <input type="text" name="text" class="replyClaim" required>
+                        <input type="button" value="Raspunde" sqlid={{claim.id}} class="replyButton" root="true">
+                        <select name="type" id="selectType">
+                            <option value="1">clarificare</option>
+                            <option value="2">contra argument</option>
+                            <option value="3">sustinere</option>
+                        </select>
+                    </form>
+                </footer>
+            </div>
+
+            </div>
+        </div>
+
+    </div>
+</body>
+
+</html>

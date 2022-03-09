@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<script>
+
+            // Handle registration
+       $(()=>{
+           $("#registerButton").on('click', (e)=>{
+               e.preventDefault()
+               const form = $("#registerForm")
+               $.ajax({
+                    type: form.attr('method'),
+                    url: 'http://localhost:3001/register',
+                    data: form.serialize(),
+                    success: (data) => {
+                        window.location.href = '/';
+                    }
+               })
+           })
+       })
+            $(()=>{
+           $("#loginButton").on('click', (e)=>{
+               e.preventDefault()
+               const form = $("#loginForm")
+               $.ajax({
+                    type: form.attr('method'),
+                    url: 'http://localhost:3001/login',
+                    data: form.serialize(),
+                   success: (data) => {
+                        window.location.href = data.redirect;
+                    }
+               })
+           })
+       })
+</script>
+<body>
+
+
+
+    <div>
+        <h1>Login</h1>
+        <form method="POST" id="loginForm">
+            <label for="username">Username</label>
+            <input name="username" id="usernameLogin" required>
+            <label for="password">Password</label>
+            <input type="password" name="password" id="passwordLogin" required>
+            <input type="submit" value="Log in" id="loginButton">
+        </form>
+    </div>
+
+    <div>
+        <h1>Or create an account</h1>
+        <form method="POST" id="registerForm">
+            <label for="username">Username</label>
+            <input name="username" id="username" required>
+            <label for="password">Password</label>
+            <input type="password" name="password" id="password" required>
+            <input type="submit" value="Register" id="registerButton">
+        </form>
+    </div>
+
+</body>
+</html>

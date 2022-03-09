@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<body>
+
+    <div class="nav">
+      <div class="right">
+         {%if user is defined%}
+        <h1 class="item">Hello {{user.username}}</h1>
+        <span class="item" id="logout"> Logout </span>
+
+        {%else%}
+
+<!--          LOGIN-->
+          <div class="dropdown-login">
+            <span id="login">Log in</span>
+            <div class="dropdown-content-login">
+                <form method="POST" id="loginForm">
+                    <label class="element" for="username">User name: <label><br>
+                    <input class="element" name="username" type="text" placeholder="username"><br>
+                    <label class="element" for="password">Password: <label><br>
+                    <input class="element" name="password" type="password" placeholder="password"><br>
+                    <input class="element" id="loginButton" type="button" value="Log in"/>
+                </form>
+            </div>
+          </div>
+
+<!--          REGISTER-->
+          <div class="dropdown-register">
+            <span id="reg">Register</span>
+            <div class="dropdown-content-register">
+                <form method="POST" id="registerForm">
+                    <label class="element" for="username">User name: <label><br>
+                    <input class="element" name="username" type="text" placeholder="username"><br>
+                    <label class="element" for="password">Password: <label><br>
+                    <input class="element" name="password" type="password" placeholder="password"><br>
+                    <input class="element" id="registerButton" type="button" value="Register"/>
+                </form>
+            </div>
+          </div>
+        </div>
+        {%endif%}
+      </div>
+    </div>
+
+{%if user is defined%}
+<div>
+    <div class="container">
+        <h1>Start a topic</h1>
+        <form method="POST" id="topicForm">
+            <label for="text">Text</label>
+            <input name="text" id="topicText" required>
+            <input type="submit" value="Start" id="postButton">
+        </form>
+    </div>
+</div>
+{%else%}
+<div class="container">
+    <h1>Log in to start topics</h1>
+</div>
+{%endif%}
+<!--    NEW TOPIC-->
+
+<div id="topics">
+    {% for topic in topics %}
+        <div class="wrapper" id="w{{topic.id}}">
+            <div class="container newItem">
+                <div class="card" sqlid="{{topic.id}}">
+                    <header class="card-header" sqlid="{{topic.id}}">
+                        <h2 class="card-title">Topic postat de {{topic.username}}</h2>
+                    </header>
+                    <div class="card-body">
+                        <p class="card-content">
+                            {{topic.text}}
+                        </p>
+                        <div id="claims{{topic.id}}">
+
+                        </div>
+                    </div>
+                    <footer class="card-footer">
+                        {%if user is defined%}
+                        {%if user.username == topic.username%}
+                        <input type="button" class="deleteButton" sqlid="{{topic.id}}" value="Delete">
+                        {%endif%}
+                        {%endif%}
+
+                    </footer>
+                </div>
+
+            </div>
+        </div>
+    {% endfor %}
+
+</div>
+
+
+</body>
+<head>
+    <meta charset="UTF-8">
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <title>Project</title>
+
+    <script>
+
+        // Api call for posting a topic
+        $(function (){
+            $('#postButton').on('click', (e)=>{
+                e.preventDefault()
+                const form = $("#topicForm")
+                const txtBox = form.find("input")
+                if(txtBox.val()){
+                    txtBox.css("border-color", "red")
+                    $.ajax({
+                            type: form.attr('method'),
+                            url: 'http://localhost:3001/topic',
+                            data: form.serialize(),
+                            success: (data) => {
+                            if(data.message === "ok"){
+                                    console.log(data);
+
+                                // create topic
+                                let card = $(document.createElement("div")).addClass("card").addClass("newItem").attr("sqlid", data.sqlid)
+
+                                // create card and append header
+                                card.append(
+                                    $(document.createElement("header")).addClass("card-header").attr("sqlid", data.sqlid)
+                                        .on("click", (e) => { e.preventDefault(); window.location.href = '/topic/' + $(e.currentTarget).attr('sqlid');})
+                                        .append(
+                                        $(document.createElement("h2")).addClass("card-title").html("Topic postat de " + data.user)
+                                    )
+                                )
+                                // then the body
+                                card.append($(document.createElement("div")).addClass("card-body")
+                                    .append($(document.createElement("p")).addClass("card-content").html(data.text)))
+
+                                // and lastly the footer
+                                card.append($(document.createElement("footer")).addClass("card-footer").append(
+                                    $(document.createElement("input")).addClass("deleteButton").attr("type", "button").attr("sqlid", data.sqlid)
+                                    .attr("value", "Delete").on("click", (e) => deleteTopic(e))
+                                ))
+
+                                let topic =
+                                    $(document.createElement("div"))
+                                            .addClass("wrapper")
+                                            .attr("id", "w"+data.sqlid)
+                                            .append(
+                                                $(document.createElement("div")).addClass("container").append(card)
+                                            )
+                                $("#topics").append(topic)
+                            }
+                            }
+                    })
+                }
+                else
+                    txtBox.css("border-color", "red")
+            })
+        })
+
+
+        $(function (){$(".deleteButton").on("click", (e) => deleteTopic(e))})
+
+
+        function deleteTopic(e){
+                e.preventDefault()
+                $.ajax({
+                        type: "DELETE",
+                        url: 'http://localhost:3001/topic/' + $(e.currentTarget).attr("sqlid"),
+                        success: (data) => {
+                            console.log("#w"+$(e.currentTarget).attr("sqlid"))
+                            $("#w"+$(e.currentTarget).attr("sqlid")).empty();
+                        }
+                    })
+            }
+
+        // Api call for logout
+        $(function (){
+            $('#logout').on('click', (e)=>{
+                e.preventDefault()
+                $.getJSON('/logout', (res)=>{
+                    if(res.message === 'ok')
+                       window.location.reload()
+                    else{
+                        alert("Error on logout")
+                    }
+                })
+            })
+        })
+
+        function formatDate(date){
+            date = new Date(date)
+            return date.getDate() + "/" + date.getMonth() + "/" + date.getFullYear() + " at " + date.getHours() + ":" + date.getMinutes();
+        }
+
+        $(function(){
+            $("[id^=claims]").each((idx, claim)=>{
+                $.ajax({
+                    type: "GET",
+                    url: 'http://localhost:3001/claim/topicId/'+$(claim).attr("id").match(/\d+/g)[0],
+                    success: (claimArray) => {
+                        console.log(claimArray);
+                        claimArray.forEach((c, idx) => {
+                            let claimDiv = $(document.createElement("div")).addClass("claimInTopic")
+                            claimDiv.append($(document.createElement("p")).addClass("postedBy").html("Explicatie postata de " + c.username + ' on ' + formatDate(c.post_date)))
+                                .append($(document.createElement("p")).html(c.text).addClass("post").css("padding-left", "16px"))
+                                .css("padding-left", "15px")
+                                .on("click", (e)=>{
+                                    window.location.href = '/claim/' + c.id;
+                                })
+                            $(claim).append(claimDiv)
+                                
+                        })
+                    }
+               })
+            })
+        })
+
+
+            // Go to topic page
+        $(function (){
+            $('.card-header').on('click', (e)=>{
+                e.preventDefault()
+                window.location.href = '/topic/' + $(e.currentTarget).attr('sqlid');
+            })
+        })
+
+        // Handle registration
+       $(()=>{
+           $("#registerButton").on('click', (e)=>{
+               e.preventDefault()
+               const form = $("#registerForm")
+               $.ajax({
+                    type: form.attr('method'),
+                    url: 'http://localhost:3001/register',
+                    data: form.serialize(),
+                    success: (data) => {
+                        if(!data.user)
+                            alert(data.msg)
+                        else
+                            window.location.reload();
+                    }
+               })
+           })
+       })
+       
+       $(()=>{
+           $("#login").on("click", (e)=>{
+               e.stopPropagation()
+               e.stopImmediatePropagation()
+               e.preventDefault()
+               let dr = $(".dropdown-content-login")
+               dr.css("display", dr.css("display") == "block" ? "none" : "block")
+               if($('.dropdown-content-register').css("display") == "block")
+                $('.dropdown-content-register').css("display", "none")
+           })
+       })
+
+       $(()=>{
+           $("#reg").on("click", (e)=>{
+                e.stopPropagation()
+                e.stopImmediatePropagation()
+                e.preventDefault()
+
+               let dr = $(".dropdown-content-register")
+               dr.css("display", dr.css("display") == "block" ? "none" : "block")
+               if($('.dropdown-content-login').css("display") == "block")
+                $('.dropdown-content-login').css("display", "none")
+           })
+       })
+
+        $(()=>{
+           $("#loginButton").on('click', (e)=>{
+               e.preventDefault()
+               const form = $("#loginForm")
+               $.ajax({
+                    type: form.attr('method'),
+                    url: 'http://localhost:3001/login',
+                    data: form.serialize(),
+                   success: (data) => {
+                        if(data.message === "ok")
+                            window.location.reload();
+                        else{
+                            alert(data.message)
+                        }
+                    }
+               })
+           })
+       })
+    </script>
+</head>
+</html>
